@@ -6,7 +6,8 @@ const cut = src.indexOf("// ----------------------------------------------------
 if (cut < 0) throw new Error("找不到页面模板分隔线");
 const logic = src.slice(0, cut);
 
-const fn = new Function(
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const fn = new AsyncFunction(
   logic +
     `
 const results = [];
@@ -53,12 +54,27 @@ const r3 = checkRateLimit("1.2.3.4", envR);
 const r4 = checkRateLimit("1.2.3.4", envR); // 第4次应被限
 results.push({ case: "限流 3/min", ok: r1 && r2 && r3 && !r4 });
 
+// 5. GEO 可见性：默认配置下 Perplexity/ChatGPT 应为可引用
+const geoHtml = geoRows({});
+const perplexityOk = geoHtml.includes("Perplexity") && geoHtml.includes("可引用");
+results.push({ case: "GEO 默认 Perplexity 可引用", ok: perplexityOk });
+// 拦截 Perplexity 后应显示已拦截
+const geoHtml2 = geoRows({ BLOCK_BOTS: "perplexitybot" });
+results.push({ case: "GEO 拦截后显示已拦截", ok: geoHtml2.includes("已拦截") });
+
+// 6. robots.txt 生成器：拦截的 bot 应出现在 Disallow
+const rtResp = robotsTxt({ BLOCK_BOTS: "gptbot,bytespider" });
+const rtText = await rtResp.text();
+const rtOk = rtText.includes("User-agent: GPTBot") && rtText.includes("User-agent: Bytespider")
+  && rtText.includes("Disallow: /") && rtText.includes("User-agent: *");
+results.push({ case: "robots.txt 生成", ok: rtOk });
+
 return results;
 `
 )();
 
 let fail = 0;
-for (const r of fn) {
+for (const r of await fn) {
   console.log(r.ok ? "PASS" : "FAIL", JSON.stringify(r));
   if (!r.ok) fail++;
 }

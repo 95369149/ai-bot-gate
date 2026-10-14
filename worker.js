@@ -29,12 +29,12 @@
 // ------------------------------------------------------------------
 const AI_BOTS = [
   // ---- search: AI 搜索引用（优质流量，建议放行）----
-  { id: "perplexitybot", name: "PerplexityBot", vendor: "Perplexity", re: /PerplexityBot/i, cat: "search", note: "Perplexity AI 搜索引用，带来真实用户点击" },
-  { id: "oai-searchbot", name: "OAI-SearchBot", vendor: "OpenAI", re: /OAI-SearchBot/i, cat: "search", note: "ChatGPT 搜索引用" },
-  { id: "chatgpt-user", name: "ChatGPT-User", vendor: "OpenAI", re: /ChatGPT-User/i, cat: "search", note: "用户在 ChatGPT 里点开你网站，用户触发的" },
-  { id: "claude-user", name: "Claude-User", vendor: "Anthropic", re: /Claude-User/i, cat: "search", note: "用户在 Claude 里点开你网站，用户触发的" },
-  { id: "claude-web", name: "Claude-Web", vendor: "Anthropic", re: /Claude-Web/i, cat: "search", note: "Claude 联网搜索引用" },
-  { id: "bingbot-ai", name: "BingBot（AI 模式）", vendor: "Microsoft", re: /Bingbot.*Copilot|Copilot.*Bingbot/i, cat: "search", note: "Copilot 引用" },
+  { id: "perplexitybot", name: "PerplexityBot", vendor: "Perplexity", re: /PerplexityBot/i, cat: "search", note: "Perplexity AI 搜索引用，带来真实用户点击", geo: "出海核心：Perplexity 回答直接带来源链接" },
+  { id: "oai-searchbot", name: "OAI-SearchBot", vendor: "OpenAI", re: /OAI-SearchBot/i, cat: "search", note: "ChatGPT 搜索引用", geo: "出海核心：ChatGPT Search 引用来源" },
+  { id: "chatgpt-user", name: "ChatGPT-User", vendor: "OpenAI", re: /ChatGPT-User/i, cat: "search", note: "用户在 ChatGPT 里点开你网站，用户触发的", geo: "出海核心：真实用户从 AI 回答点进来" },
+  { id: "claude-user", name: "Claude-User", vendor: "Anthropic", re: /Claude-User/i, cat: "search", note: "用户在 Claude 里点开你网站，用户触发的", geo: "出海：Claude 用户触发访问" },
+  { id: "claude-web", name: "Claude-Web", vendor: "Anthropic", re: /Claude-Web/i, cat: "search", note: "Claude 联网搜索引用", geo: "出海：Claude 联网搜索引用" },
+  { id: "bingbot-ai", name: "BingBot（AI 模式）", vendor: "Microsoft", re: /Bingbot.*Copilot|Copilot.*Bingbot/i, cat: "search", note: "Copilot 引用", geo: "出海/御刃：Copilot 与必应 AI 回答引用" },
 
   // ---- index: 训练/索引爬虫（耗带宽，建议挑战或拦截）----
   { id: "gptbot", name: "GPTBot", vendor: "OpenAI", re: /GPTBot/i, cat: "index", note: "OpenAI 训练数据爬虫，不带来流量" },
@@ -59,6 +59,19 @@ const AI_BOTS = [
 
 const CAT_LABEL = { search: "AI搜索引用", index: "训练/索引爬虫", agent: "代理式抓取" };
 const CAT_ACTION_DEFAULT = { search: "allow", index: "challenge", agent: "block" };
+
+// ------------------------------------------------------------------
+// GEO 目标引擎映射（来自 GEO 挖矿实战：出海=Perplexity/ChatGPT/Gemini，国内=豆包/DeepSeek/Kimi）
+// bots: 对应指纹 id 列表（空 = 该引擎爬虫 UA 未公开，按默认策略处理）
+// ------------------------------------------------------------------
+const GEO_TARGETS = [
+  { engine: "Perplexity", market: "出海", bots: ["perplexitybot"], note: "回答直接带来源链接，GEO 主战场" },
+  { engine: "ChatGPT Search", market: "出海", bots: ["oai-searchbot", "chatgpt-user"], note: "搜索引用来源，真实用户点击" },
+  { engine: "Claude", market: "出海", bots: ["claude-web", "claude-user"], note: "联网搜索引用，相对弱但存在" },
+  { engine: "Copilot / 必应 AI", market: "出海/御刃", bots: ["bingbot-ai"], note: "必应 AI 回答引用来源" },
+  { engine: "Gemini", market: "出海", bots: [], note: "联网抓取 UA 未公开，未知 UA 默认放行即不影响" },
+  { engine: "豆包 / DeepSeek / Kimi", market: "国内", bots: [], note: "国内 AI 搜索爬虫 UA 未公开，未知 UA 默认放行即不影响" },
+];
 
 // 内存限流（单实例尽力而为，生产建议换 KV/Durable Object）
 const rateMap = new Map();
@@ -99,6 +112,49 @@ function checkRateLimit(ip, env) {
   rec.count += 1;
   rateMap.set(ip, rec);
   return rec.count <= limit;
+}
+
+function geoRows(env) {
+  return GEO_TARGETS.map((t) => {
+    if (t.bots.length === 0) {
+      return `<tr><td><b>${t.engine}</b><br><span class="dim">${t.market}</span></td>
+<td class="dim">${t.note}</td><td><span class="pill" style="background:#64748b">未知UA默认放行</span></td></tr>`;
+    }
+    const states = t.bots.map((id) => {
+      const bot = AI_BOTS.find((b) => b.id === id);
+      return { bot, action: decide(bot, env) };
+    });
+    const blocked = states.filter((s) => s.action === "block");
+    const challenged = states.filter((s) => s.action === "challenge");
+    let pill, bg;
+    if (blocked.length === states.length) { pill = "⛔ 已拦截（AI 引用不到你）"; bg = "#ef4444"; }
+    else if (blocked.length > 0 || challenged.length > 0) { pill = "🟡 部分受限"; bg = "#f59e0b"; }
+    else { pill = "✅ 可引用"; bg = "#22c55e"; }
+    const detail = states.map((s) => `${s.bot.name}=${s.action}`).join("，");
+    return `<tr><td><b>${t.engine}</b><br><span class="dim">${t.market} · ${t.note}</span></td>
+<td class="dim">${detail}</td><td><span class="pill" style="background:${bg}">${pill}</span></td></tr>`;
+  }).join("");
+}
+
+function robotsTxt(env) {
+  const lines = [
+    "# 由 AIGate 生成，与网关配置保持一致",
+    "# 网关是执行层（真拦截），robots.txt 是声明层（靠自觉）——两层都要",
+    "",
+  ];
+  for (const b of AI_BOTS) {
+    if (decide(b, env) === "block") {
+      lines.push(`User-agent: ${b.name}`);
+      lines.push("Disallow: /");
+      lines.push("");
+    }
+  }
+  lines.push("User-agent: *");
+  lines.push("Disallow:");
+  lines.push("");
+  return new Response(lines.join("\n"), {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
 }
 
 // ------------------------------------------------------------------
@@ -181,6 +237,10 @@ code{background:#0f172a;padding:2px 8px;border-radius:6px;font-size:13px}</style
 <button onclick="test()">开始判定</button>
 <div class="result" id="r"></div></div>
 
+<h2>🎯 GEO 引用可见性</h2>
+<p class="dim">GEO 时代两件事：<b>被 AI 引用</b>（GEO）+ <b>不被爬虫拖垮</b>。下表看你的网站现在能被哪些 AI 引用：</p>
+<table><tr><th>AI 引擎</th><th>对应爬虫与当前动作</th><th>引用状态</th></tr>${geoRows(env)}</table>
+
 <h2>📋 AI 爬虫指纹库（默认策略）</h2>
 <table><tr><th>爬虫</th><th>类别</th><th>说明</th><th>默认动作</th></tr>${botTableRows()}</table>
 
@@ -236,6 +296,15 @@ robots.txt 只能靠自觉，封 IP 段误伤太大。<br>
 <div class="cta"><a class="btn" href="/__aigate">打开控制台试试</a>
 <a class="btn ghost" href="#deploy">一键部署教程</a></div></div>
 
+<div class="sec"><h2>GEO 时代，你要同时做好两件事</h2>
+<p style="color:#94a3b8;font-size:15px;line-height:1.9">
+<b style="color:#e2e8f0">第一，被 AI 引用。</b>Perplexity、ChatGPT Search、Claude 联网搜索——这些引擎的回答直接带来源链接，
+是新一代流量入口。AIGate 默认放行这类"AI 搜索引用"，还在控制台里给你一张 <b style="color:#e2e8f0">GEO 引用可见性表</b>，
+一眼看清你的网站现在能被哪些 AI 引用。<br><br>
+<b style="color:#e2e8f0">第二，不被爬虫拖垮。</b>GPTBot、ClaudeBot、CCBot、Bytespider——训练爬虫只烧带宽不带来访问，
+默认走 JS 挑战或直接拦截。网关是执行层（真拦截），再送你一份自动生成的
+<a href="/__aigate/robots.txt" style="color:#38bdf8">robots.txt</a> 做声明层，两层都要。</p></div>
+
 <div class="sec"><h2>它怎么工作</h2><div class="grid">
 <div class="card"><div class="num">🔍</div><h3>识别</h3><p>内置 ${AI_BOTS.length} 种 AI 爬虫指纹库：GPTBot、ClaudeBot、PerplexityBot、Bytespider……按 UA 精准识别，不靠猜。</p></div>
 <div class="card"><div class="num">🎯</div><h3>分类处置</h3><p>AI 搜索引用（Perplexity/ChatGPT 用户点击）→ 放行，这是你的 GEO 流量；训练爬虫 → 挑战或拦截；恶意高频抓取 → 直接 403。</p></div>
@@ -268,6 +337,9 @@ export default {
     // 控制台与 API
     if (url.pathname === "/__aigate" || url.pathname === "/__aigate/") {
       return dashboardPage(env);
+    }
+    if (url.pathname === "/__aigate/robots.txt") {
+      return robotsTxt(env);
     }
     if (url.pathname === "/__aigate/api/test") {
       const testUa = url.searchParams.get("ua") || "";
