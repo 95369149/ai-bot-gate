@@ -1,0 +1,17 @@
+# AIGate · AI 爬虫防火墙
+# 部署：npx wrangler deploy
+name = "ai-bot-gate"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+# demo = 演示落地页；proxy = 挂到域名前做网关
+AI_GATE_MODE = "demo"
+# proxy 模式必填：源站地址
+# ORIGIN_URL = "https://origin.example.com"
+DEFAULT_SEARCH_ACTION = "allow"      # AI搜索引用：放行（要 GEO 流量）
+DEFAULT_INDEX_ACTION = "challenge"    # 训练爬虫：JS 挑战
+DEFAULT_AGENT_ACTION = "block"        # 代理抓取：拦截
+# ALLOW_BOTS = "gptbot,claudebot"     # 强制放行（逗号分隔 bot id）
+# BLOCK_BOTS = "bytespider"           # 强制拦截
+RATE_LIMIT_PER_MIN = "30"             # 单 IP 每分钟 AI 爬虫请求上限
