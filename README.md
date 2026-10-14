@@ -4,7 +4,7 @@
 
 [![Deploy](https://img.shields.io/badge/Cloudflare-Workers-orange)](https://workers.cloudflare.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-14%20passed-green)](test.mjs)
+[![Tests](https://img.shields.io/badge/tests-17%20passed-green)](test.mjs)
 
 **在线演示**：https://ai-bot-gate.fangzimo168.workers.dev/ ｜
 **控制台**（UA 在线测试）：https://ai-bot-gate.fangzimo168.workers.dev/__aigate
@@ -12,9 +12,9 @@
 ## 为什么做
 
 HN 242 分热帖《I posted to HN, and then my website was flooded with AI bot traffic》：
-博主上 HN 热门后，近一半流量来自某家 AI 简报服务的每分钟几十次轮询，
+博主上 HN 热门后，近一半流量来自某家 AI 简报服务的高频轮询，
 加上 ClaudeBot / GPTBot / Bytespider，服务器被拖慢。
-评论区有人晒出 ClaudeBot 一个月烧掉 **$10K** 云账单。
+评论区多位站长晒出被 AI 爬虫拖慢、烧出高额云账单的案例。
 
 robots.txt 只能靠自觉，封 IP 段误伤太大——
 缺一个"精细选择"的工具：**AI 搜索引用是优质流量（GEO），要放行；训练爬虫只烧钱，要挡掉。**
@@ -66,7 +66,7 @@ npx wrangler deploy
 ## 本地测试
 
 ```bash
-node test.mjs   # 14 项：识别 / 默认动作 / 覆盖配置 / 限流
+node test.mjs   # 17 项：识别 / 默认动作 / 覆盖配置 / 限流 / GEO / robots.txt
 ```
 
 ## 版本规划
