@@ -71,7 +71,10 @@ node test.mjs   # 14 项：识别 / 默认动作 / 覆盖配置 / 限流
 
 ## 版本规划
 
-- **Free**（本仓库）：指纹库 + 三类策略 + 限流 + 控制台，规则手动更新
+- **Free v0.2**（本仓库）：指纹库 + 三类策略 + 限流 + 控制台，规则手动更新
+  - 🎯 **GEO 引用可见性面板**：你的网站能被 Perplexity / ChatGPT Search / Claude / Copilot 引用吗？一目了然
+  - 🤖 **robots.txt 生成器**（`/__aigate/robots.txt`）：与网关配置自动保持一致，执行层 + 声明层两手抓
+  - GEO 知识：出海=Perplexity/ChatGPT/Gemini，国内=豆包/DeepSeek/Kimi——引用价值已标注进指纹库
 - **Pro**（规划中）：☁️ 云端规则库自动更新 · 📊 拦截统计面板（省了多少带宽费） ·
   🖥️ 多站点统一管理 · 🔒 爬虫身份验证（反向 DNS 防冒充）
 
